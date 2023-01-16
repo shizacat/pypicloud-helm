@@ -1,0 +1,110 @@
+{{- if not .Values.config.name -}}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "pypicloud.fullname" . }}-configmap
+  labels:
+    {{- include "pypicloud.labels" . | nindent 4 }}
+data:
+  config.ini: |
+    [app:main]
+    use = egg:pypicloud
+
+    pyramid.reload_templates = false
+    pyramid.debug_authorization = false
+    pyramid.debug_notfound = false
+    pyramid.debug_routematch = false
+    pyramid.default_locale_name = en
+
+    {{- if .Values.config.storage_backend.files.enabled }}
+    pypi.storage = file
+    storage.dir = /pypicloud/packages
+    {{- end }}
+
+    {{- if .Values.config.storage_backend.s3.enabled }}
+    pypi.storage = s3
+    {{- range $key, $value := .Values.config.storage_backend.s3.params }}
+    storage.{{ $key }} = {{ $value }}
+    {{- end }}
+    {{- end }}
+
+    # Cache backend
+    pypi.db = sql
+    db.url = {{ .Values.config.cache.url }}
+
+    # Access Control
+    # -------------------------------------------------------------------------
+    {{ if .Values.config.access_control_backend.config.enable }}
+    pypi.auth = config
+    {{- range $key, $value := .Values.config.access_control_backend.config.params }}
+    {{ printf "%s = %s" $key $value }}
+    {{- end }}
+    {{- end }}
+
+    {{ if .Values.config.access_control_backend.sql.enable }}
+    pypi.auth = sql
+    auth.db.url = {{ .Values.config.access_control_backend.sql.url }}
+    {{- end }}
+
+    {{ if .Values.config.access_control_backend.ldap.enable }}
+    pypi.auth = ldap
+    {{- range $key, $value := .Values.config.access_control_backend.ldap.params }}
+    {{ printf "auth.ldap.%s = %s" $key $value }}
+    {{- end }}
+    {{- end }}
+
+    # -------------------------------------------------------------------------
+
+    {{- range $key, $value := .Values.config.params }}
+    {{ printf "%s = %s" $key $value }}
+    {{- end }}
+
+    ###
+    # wsgi server configuration
+    ###
+
+    [uwsgi]
+    paste = config:%p
+    paste-logger = %p
+    master = true
+    uid = pypicloud
+    gid = pypicloud
+    processes = 20
+    reload-mercy = 15
+    worker-reload-mercy = 15
+    max-requests = 1000
+    enable-threads = true
+    http = 0.0.0.0:8080
+
+    ###
+    # logging configuration
+    # http://docs.pylonsproject.org/projects/pyramid/en/latest/narr/logging.html
+    ###
+
+    [loggers]
+    keys = root, boto
+
+    [handlers]
+    keys = console
+
+    [formatters]
+    keys = generic
+
+    [logger_root]
+    level = INFO
+    handlers = console
+
+    [logger_boto]
+    level = WARN
+    qualname = boto
+    handlers =
+
+    [handler_console]
+    class = StreamHandler
+    args = (sys.stderr,)
+    level = NOTSET
+    formatter = generic
+
+    [formatter_generic]
+    format = %(levelname)s %(asctime)s [%(name)s] %(message)s
+{{- end }}
