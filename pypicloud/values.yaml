@@ -180,8 +180,14 @@ config:
     session.secure: "true"
 
     # group name: authenticated, everyone
+    # The list it
     pypi.default_read: everyone
     pypi.default_write: authenticated
+    # If you want install everyone and you had enabled the cache,
+    # you should to enable and update the cache for everyone.
+    # pypi.cache_update = everyone authenticated
 
     # Cache from pypi.org
+    # Values: none, redirect, cache
+    # https://pypicloud.readthedocs.io/en/latest/topics/configuration.html#pypi-fallback
     # pypi.fallback: cache
